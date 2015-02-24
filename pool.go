@@ -1,34 +1,26 @@
 package fireload
 
 import (
+	"container/ring"
 	"errors"
 	"math/rand"
-	"time"
 )
 
 // Pool .
 type Pool struct {
-	Nodes     []*Namespace
-	lastIndex int
+	Nodes *ring.Ring
 	Strategy
-	source rand.Source
 }
 
-// ErrNilPointer .
-var ErrNilPointer = errors.New("Nodes slice cannot contain a nil pointer")
-
 // NewPool .
-func NewPool(nodes []*Namespace) (*Pool, error) {
-	for _, ptr := range nodes {
-		if ptr == nil {
-			return nil, ErrNilPointer
-		}
+func NewPool(nodes ...Namespace) (*Pool, error) {
+	r := ring.New(len(nodes))
+	for _, node := range nodes {
+		r.Value = node
+		r = r.Next()
 	}
-	return &Pool{
-		Nodes:     nodes,
-		source:    rand.NewSource(time.Now().UnixNano()),
-		lastIndex: -1,
-	}, nil
+
+	return &Pool{Nodes: r}, nil
 }
 
 // ErrInvalidStrategy .
@@ -47,7 +39,7 @@ func (p *Pool) SetStrategy(strategy Strategy) error {
 }
 
 // Next .
-func (p *Pool) Next() *Namespace {
+func (p *Pool) Next() Namespace {
 	switch p.Strategy {
 	case StrategyRoundRobin:
 		return p.NextRoundRobin()
@@ -57,13 +49,14 @@ func (p *Pool) Next() *Namespace {
 }
 
 // NextRandom .
-func (p *Pool) NextRandom() *Namespace {
-	p.lastIndex = int(p.source.Int63() % int64(len(p.Nodes)))
-	return p.Nodes[p.lastIndex]
+func (p *Pool) NextRandom() Namespace {
+	n := rand.Intn(p.Nodes.Len())
+	p.Nodes = p.Nodes.Move(n)
+	return p.Nodes.Value.(Namespace)
 }
 
 // NextRoundRobin .
-func (p *Pool) NextRoundRobin() *Namespace {
-	p.lastIndex = (p.lastIndex + 1) % len(p.Nodes)
-	return p.Nodes[p.lastIndex]
+func (p *Pool) NextRoundRobin() Namespace {
+	p.Nodes = p.Nodes.Next()
+	return p.Nodes.Value.(Namespace)
 }
