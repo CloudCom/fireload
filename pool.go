@@ -38,6 +38,13 @@ func (p *Pool) SetStrategy(strategy Strategy) error {
 	return nil
 }
 
+// Add .
+func (p *Pool) Add(ns Namespace) {
+	s := &ring.Ring{Value: ns}
+	r := p.Nodes.Link(s)
+	s.Link(r)
+}
+
 // Next .
 func (p *Pool) Next() Namespace {
 	switch p.Strategy {

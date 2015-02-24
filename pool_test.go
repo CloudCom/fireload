@@ -1,6 +1,11 @@
 package fireload
 
-import "testing"
+import (
+	"container/ring"
+	"testing"
+
+	"github.com/kr/pretty"
+)
 
 var testNodes = []Namespace{
 	{Domain: "node-1.firebaseio.com"},
@@ -16,20 +21,32 @@ func Test_NewPool(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assertSeenSet(t, p.Nodes, testNodes)
+}
+
+func assertSeenSet(t *testing.T, nodes *ring.Ring, expected []Namespace) {
 	seen := map[string]int{}
-	for i := 0; i < p.Nodes.Len(); i++ {
-		val := p.Nodes.Value
+	for i := 0; i < nodes.Len(); i++ {
+		val := nodes.Value
 		ns, ok := val.(Namespace)
 		if !ok {
-			t.Fatalf("Expected p.Nodes to be a Ring with Namespace values. Got %T", val)
+			t.Fatalf("Expected nodes to be a Ring with Namespace values. Got %T", val)
 		}
 		seen[ns.Domain]++
-		p.Nodes = p.Nodes.Next()
+		nodes = nodes.Next()
+	}
+
+	for _, ns := range expected {
+		if _, ok := seen[ns.Domain]; !ok {
+			t.Fatalf("Expected nodes to contain %s.\n\n%# v", ns.Domain, pretty.Formatter(seen))
+		}
+
+		seen[ns.Domain]--
 	}
 
 	for domain, count := range seen {
-		if count != 1 {
-			t.Fatalf("Expected to see %s once, but saw it %d times", domain, count)
+		if count != 0 {
+			t.Fatalf("Expected count for %s off by %d", domain, count)
 		}
 	}
 }
@@ -68,6 +85,18 @@ func Test_Pool_SetStrategy_Invalid(t *testing.T) {
 	if err := p.SetStrategy(Strategy(-1)); err != ErrInvalidStrategy {
 		t.Fatalf("Expected SetStrategy with invalid strategy to return %s but got %v", ErrInvalidStrategy, err)
 	}
+}
+
+func Test_Pool_Add_Pass(t *testing.T) {
+	p, err := NewPool(testNodes...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newNS := NewNamespace("node-6.firebaseio.com")
+	p.Add(newNS)
+
+	assertSeenSet(t, p.Nodes, append(testNodes, newNS))
 }
 
 func Test_Pool_NextRandom(t *testing.T) {
