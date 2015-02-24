@@ -57,6 +57,7 @@ func (p *Pool) Drop(domain string) error {
 			prev := p.Nodes.Prev()
 			next := p.Nodes.Next()
 			prev.Link(next)
+			p.Nodes = nil
 			p.Nodes = prev
 		}
 
