@@ -38,7 +38,9 @@ func assertSeenSet(t *testing.T, nodes *ring.Ring, expected []Namespace) {
 
 	for _, ns := range expected {
 		if _, ok := seen[ns.Domain]; !ok {
-			t.Fatalf("Expected nodes to contain %s.\n\n%# v", ns.Domain, pretty.Formatter(seen))
+			t.Logf("Expected: %# v", pretty.Formatter(expected))
+			t.Logf("Saw: %# v", pretty.Formatter(seen))
+			t.Fatalf("Missing %s.", ns.Domain)
 		}
 
 		seen[ns.Domain]--
@@ -97,6 +99,32 @@ func Test_Pool_Add_Pass(t *testing.T) {
 	p.Add(newNS)
 
 	assertSeenSet(t, p.Nodes, append(testNodes, newNS))
+}
+
+func Test_Pool_Drop_Pass(t *testing.T) {
+	p, err := NewPool(testNodes...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := p.Drop("node-1.firebaseio.com"); err != nil {
+		t.Fatal(err)
+	}
+
+	assertSeenSet(t, p.Nodes, testNodes[1:])
+}
+
+func Test_Pool_Drop_Pass_NodeDoesntExist(t *testing.T) {
+	p, err := NewPool(testNodes...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := p.Drop("node-nope.firebaseio.com"); err != nil {
+		t.Fatal(err)
+	}
+
+	assertSeenSet(t, p.Nodes, testNodes)
 }
 
 func Test_Pool_NextRandom(t *testing.T) {

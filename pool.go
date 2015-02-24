@@ -45,6 +45,26 @@ func (p *Pool) Add(ns Namespace) {
 	s.Link(r)
 }
 
+// Drop .
+func (p *Pool) Drop(domain string) error {
+	for i := 0; i < p.Nodes.Len(); i++ {
+		ns, ok := p.Nodes.Value.(Namespace)
+		if !ok {
+			return errors.New("Could not typecast Ring.Value to Namespace")
+		}
+
+		if ns.Domain == domain {
+			prev := p.Nodes.Prev()
+			next := p.Nodes.Next()
+			prev.Link(next)
+			p.Nodes = prev
+		}
+
+		p.Nodes = p.Nodes.Next()
+	}
+	return nil
+}
+
 // Next .
 func (p *Pool) Next() Namespace {
 	switch p.Strategy {
